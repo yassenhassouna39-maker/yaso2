@@ -1,0 +1,17 @@
+{
+  "name": "flashr-capacitor",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "echo \"No build step. Using web/ directly.\"",
+    "cap:add:android": "npx cap add android",
+    "cap:sync": "npx cap sync",
+    "cap:open:android": "npx cap open android"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "latest"
+  },
+  "dependencies": {
+    "@capacitor/android": "latest"
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "appId": "com.flashr.app",
+  "appName": "Flashr",
+  "webDir": "web",
+  "bundledWebRuntime": false
+}

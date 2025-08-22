@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Flashr Courses — Web & App</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0b0f14"/>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#0b0f14;--card:#111b2b;--accent:#66e3c4;--text:#fff;--muted:#aab}
+    body{font-family:"Cairo",sans-serif;background:var(--bg);color:var(--text);margin:0}
+    .container{max-width:1024px;margin:auto;padding:20px}
+    .panel{background:var(--card);padding:20px;border-radius:14px;margin-top:18px;box-shadow:0 4px 20px #0003}
+    input,button,select{font-family:inherit;font-size:16px}
+    input{width:100%;padding:10px;border-radius:10px;border:none;margin:6px 0;background:#0d1625;color:#fff}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .btn{padding:10px 14px;border:none;border-radius:10px;cursor:pointer}
+    .primary{background:var(--accent);color:#000;font-weight:700}
+    .ghost{background:#1b2740;color:#fff}
+    .muted{color:var(--muted);margin-top:8px}
+    .tabs{display:flex;gap:8px;margin:8px 0}
+    .tab{padding:8px 12px;border-radius:999px;background:#0d1625;cursor:pointer}
+    .tab.active{background:var(--accent);color:#000;font-weight:700}
+    ul{margin:0;padding-inline-start:18px}
+    .badge{background:#0d1625;padding:4px 8px;border-radius:999px;margin-inline-start:8px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+    .divider{height:1px;background:#23314f;margin:14px 0}
+  </style>
+  <!-- Firebase compat SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-analytics.js"></script>
+  <!-- jsPDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h1>📚 Flashr — الدورات والشهادات</h1>
+
+    <div id="auth" class="panel">
+      <div class="tabs">
+        <div class="tab active" id="tabEmail">إيميل</div>
+        <div class="tab" id="tabPhone">موبايل</div>
+      </div>
+
+      <div id="emailBox">
+        <div class="row">
+          <input id="email" type="email" placeholder="البريد الإلكتروني">
+          <input id="password" type="password" placeholder="كلمة المرور">
+        </div>
+        <div class="row">
+          <button id="loginBtn"  class="btn primary">دخول</button>
+          <button id="signupBtn" class="btn ghost">تسجيل جديد</button>
+        </div>
+        <button id="resetBtn" class="btn ghost" style="margin-top:8px">إعادة تعيين كلمة المرور</button>
+      </div>
+
+      <div id="phoneBox" style="display:none">
+        <div class="row">
+          <input id="phone" type="tel" placeholder="رقم الموبايل (مثال: +2010xxxxxxx)">
+          <button id="sendOtpBtn" class="btn primary">إرسال كود</button>
+        </div>
+        <div id="recaptcha-container"></div>
+        <div class="row">
+          <input id="otp" placeholder="أدخل الكود">
+          <button id="verifyOtpBtn" class="btn ghost">تأكيد الكود</button>
+        </div>
+      </div>
+
+      <div id="authMsg" class="muted"></div>
+    </div>
+
+    <div id="app" style="display:none" class="panel">
+      <div class="grid">
+        <div>
+          <h2>مرحبًا <span id="userEmail"></span></h2>
+          <button id="logoutBtn" class="btn ghost">تسجيل الخروج</button>
+          <div class="muted" id="uidBox"></div>
+        </div>
+        <div>
+          <button id="certBtn" class="btn primary">تحميل الشهادة</button>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+      <h3>الكورسات</h3>
+      <ul id="coursesList"></ul>
+
+      <div id="devPanel" class="panel" style="display:none">
+        <h3>لوحة المطوّر <span class="badge">خاص بـ yassenhassouna39@gmail.com</span></h3>
+        <div class="row">
+          <input id="courseName" placeholder="اسم الكورس">
+          <button id="addCourseBtn" class="btn primary">إضافة كورس</button>
+        </div>
+        <div class="divider"></div>
+        <h4>المستخدمون الجدد</h4>
+        <ul id="usersList"></ul>
+      </div>
+    </div>
+  </div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyD6pxL1-0VpUm36wmK6uMHAPSHNFmOZitk",
+  authDomain: "flash-card-yan.firebaseapp.com",
+  projectId: "flash-card-yan",
+  storageBucket: "flash-card-yan.firebasestorage.app",
+  messagingSenderId: "835062893775",
+  appId: "1:835062893775:web:7b0347f047f1c88e513bba",
+  measurementId: "G-FGX8WYD775"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db   = firebase.firestore();
+try { firebase.analytics(); } catch(e){}
+
+const devEmail = "yassenhassouna39@gmail.com";
+function $(id){ return document.getElementById(id); }
+function tErr(code){
+  const map = {
+    "auth/user-not-found":"الحساب غير موجود.",
+    "auth/wrong-password":"كلمة المرور غير صحيحة.",
+    "auth/email-already-in-use":"هذا البريد مستخدم بالفعل.",
+    "auth/invalid-email":"البريد الإلكتروني غير صالح.",
+    "auth/weak-password":"كلمة المرور ضعيفة جدًا.",
+    "auth/too-many-requests":"محاولات كثيرة، جرّب لاحقًا.",
+    "auth/invalid-verification-code":"الكود غير صحيح.",
+    "auth/invalid-verification-id":"انتهت صلاحية الجلسة، أعد الإرسال."
+  };
+  return map[code] || ("حدث خطأ: "+code);
+}
+
+// Tabs
+$("tabEmail").onclick = ()=>{
+  $("tabEmail").classList.add("active");
+  $("tabPhone").classList.remove("active");
+  $("emailBox").style.display="block";
+  $("phoneBox").style.display="none";
+  $("authMsg").textContent="";
+};
+$("tabPhone").onclick = ()=>{
+  $("tabPhone").classList.add("active");
+  $("tabEmail").classList.remove("active");
+  $("emailBox").style.display="none";
+  $("phoneBox").style.display="block";
+  $("authMsg").textContent="";
+};
+
+// Email/Password
+$("loginBtn").onclick = async ()=>{
+  try{
+    await auth.signInWithEmailAndPassword($("email").value, $("password").value);
+    $("authMsg").textContent = "تم تسجيل الدخول بنجاح ✅";
+  }catch(e){ $("authMsg").textContent = tErr(e.code); }
+};
+$("signupBtn").onclick = async ()=>{
+  try{
+    const cred = await auth.createUserWithEmailAndPassword($("email").value, $("password").value);
+    $("authMsg").textContent = "تم إنشاء الحساب بنجاح 🎉";
+    await db.collection("users").doc(cred.user.uid).set({
+      uid: cred.user.uid,
+      email: cred.user.email || null,
+      phone: cred.user.phoneNumber || null,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge:true });
+  }catch(e){ $("authMsg").textContent = tErr(e.code); }
+};
+$("resetBtn").onclick = async ()=>{
+  try{
+    await auth.sendPasswordResetEmail($("email").value);
+    $("authMsg").textContent = "📩 تم إرسال رابط إعادة التعيين لبريدك.";
+  }catch(e){ $("authMsg").textContent = tErr(e.code); }
+};
+
+// Phone sign-in
+let confirmationResult = null;
+function setupRecaptcha(){
+  if(window._recaptchaReady) return;
+  window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', { size: 'invisible' });
+  window._recaptchaReady = true;
+}
+$("sendOtpBtn").onclick = async ()=>{
+  try{
+    setupRecaptcha();
+    confirmationResult = await auth.signInWithPhoneNumber($("phone").value, window.recaptchaVerifier);
+    $("authMsg").textContent = "📲 تم إرسال الكود. افحص الرسائل.";
+  }catch(e){
+    $("authMsg").textContent = tErr(e.code);
+  }
+};
+$("verifyOtpBtn").onclick = async ()=>{
+  try{
+    if(!confirmationResult){ $("authMsg").textContent="أرسل الكود أولًا."; return; }
+    const cred = await confirmationResult.confirm($("otp").value);
+    $("authMsg").textContent = "تم تسجيل الدخول بالموبايل ✅";
+    await db.collection("users").doc(cred.user.uid).set({
+      uid: cred.user.uid,
+      email: cred.user.email || null,
+      phone: cred.user.phoneNumber || null,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge:true });
+  }catch(e){
+    $("authMsg").textContent = tErr(e.code);
+  }
+};
+
+// State
+auth.onAuthStateChanged(async (user)=>{
+  if(user){
+    $("auth").style.display="none";
+    $("app").style.display="block";
+    $("userEmail").textContent = user.email || user.phoneNumber || "";
+    $("uidBox").textContent = "UID: " + user.uid;
+    await db.collection("users").doc(user.uid).set({
+      uid: user.uid,
+      email: user.email || null,
+      phone: user.phoneNumber || null,
+      lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge:true });
+
+    try{
+      const snap = await db.collection("courses").orderBy("name").get();
+      $("coursesList").innerHTML = "";
+      if(snap.empty){
+        const li = document.createElement('li');
+        li.textContent = "مافيش كورسات حالياً. استخدم لوحة المطوّر لإضافة كورس.";
+        $("coursesList").appendChild(li);
+      } else {
+        snap.forEach(doc=>{
+          const li = document.createElement('li');
+          li.textContent = doc.data().name;
+          $("coursesList").appendChild(li);
+        });
+      }
+    }catch(e){}
+
+    if((user.email||"").toLowerCase() === devEmail){
+      $("devPanel").style.display="block";
+      const us = await db.collection("users").orderBy("createdAt","desc").limit(50).get();
+      $("usersList").innerHTML="";
+      us.forEach(d=>{
+        const u = d.data();
+        const li = document.createElement('li');
+        li.textContent = (u.email||u.phone||"") + " — " + (u.createdAt?.toDate ? u.createdAt.toDate().toLocaleString() : "");
+        $("usersList").appendChild(li);
+      });
+    }
+
+  }else{
+    $("auth").style.display="block";
+    $("app").style.display="none";
+  }
+});
+
+$("logoutBtn").onclick = ()=>{ auth.signOut(); $("authMsg").textContent="تم تسجيل الخروج."; };
+
+$("certBtn").onclick = ()=>{
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const user = auth.currentUser;
+  doc.text("شهادة إتمام الكورس", 20, 20);
+  doc.text("الطالب: " + (user?.email || user?.phoneNumber || ""), 20, 40);
+  doc.save("certificate.pdf");
+};
+</script>
+</body>
+</html>
